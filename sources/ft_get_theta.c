@@ -6,13 +6,14 @@
 /*   By: nathan <nathan@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/09/25 17:57:43 by nathan            #+#    #+#             */
-/*   Updated: 2018/10/06 12:21:49 by nathan           ###   ########.fr       */
+/*   Updated: 2018/10/15 11:56:57 by nathan           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <types.h>
 
 #include "libft.h"
 #include "types.h"
@@ -77,9 +78,17 @@ extern t_bool		ft_get_theta(double *out_theta0, double *out_theta1, double *out_
 		return (FALSE);
 	}
 
-	ptr = (t_pchar)ft_strchr(file.bytes, ',');
+	if ((ptr = (t_pchar)ft_strchr(file.bytes, ',')) == NULL)
+	{
+		FT_ERROR("ft_strchr() failed str %s", (char *)file.bytes);
+		return (FALSE);
+	}
 	*ptr = '\0';
-	ptr2 = (t_pchar)ft_strchr(ptr + 1, ',');
+	if ((ptr2 = (t_pchar)ft_strchr(ptr + 1, ',')) == NULL)
+	{
+		FT_ERROR("ft_strchr() failed str %s", ptr + 1);
+		return (FALSE);
+	}
 	*ptr2 = '\0';
 	*out_theta0 = atof(file.bytes);
 	*out_theta1 = atof(ptr + 1);

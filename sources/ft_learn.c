@@ -6,10 +6,11 @@
 /*   By: nathan <nathan@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/09/25 12:26:37 by nathan            #+#    #+#             */
-/*   Updated: 2018/10/06 13:05:39 by nathan           ###   ########.fr       */
+/*   Updated: 2018/10/15 13:45:19 by nathan           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
+#include <types.h>
 #include "error.h"
 #include "libft.h"
 #include "types.h"
@@ -43,11 +44,57 @@ static t_bool		ft_get_data(t_pchar path, t_data **data)
 {
 	t_buffer	file;
 	t_pchar		*tab;
+	t_pchar		ptr;
+	t_uint		i;
 
 	if (!ft_map_file(path, &file))
 	{
 		FT_WARNING("ft_map_file() failed path %s", path);
 		return (FALSE);
+	}
+
+	if (!ft_strchr(file.bytes, '\n') || *(ft_strchr(file.bytes, '\n') + 1) == '\0')
+	{
+		FT_ERROR("Fichier \033[38;5;27m%s\033[0m mal formaté : Aucune donnée", path);
+		return (FALSE);
+	}
+
+	for (unsigned long n = ft_strchr(file.bytes, '\n') - (char *)file.bytes + 1 ; ((char *)(file.bytes))[n] ; n ++)
+	{
+		if (!ft_isdigit(((char *)(file.bytes))[n]) &&
+			((char *)(file.bytes))[n] != ',' && ((char *)(file.bytes))[n] != '\n')
+		{
+			FT_ERROR("Fichier \033[38;5;27m%s\033[0m mal formaté : Caractère inconnu (%c)", path, ((char *)(file.bytes))[n]);
+			return (FALSE);
+		}
+	}
+
+	i = 0;
+	for (unsigned long n = ft_strchr(file.bytes, '\n') - (char *)file.bytes + 1 ; ft_strchr(file.bytes + n, '\n') ; n ++)
+	{
+		FT_DEBUG("Line %d : %.*s", i, (int)(ft_strchr(file.bytes + n, '\n') - (char *)file.bytes - n), (char *)file.bytes + n);
+		if (!ft_isdigit(((char *)(file.bytes))[n]))
+		{
+			FT_ERROR("Fichier \033[38;5;27m%s\033[0m mal formaté : Nombre absent ligne %d", path, i);
+			return (FALSE);
+		}
+		if ((ptr = ft_strchr(file.bytes + n, ',')) == NULL || ptr > ft_strchr(file.bytes + n, '\n'))
+		{
+			FT_ERROR("Fichier \033[38;5;27m%s\033[0m mal formaté : Caractère de séparation (,) absent ligne %d", path, i);
+			return (FALSE);
+		}
+		if (!ft_isdigit(*(ptr + 1)))
+		{
+			FT_ERROR("Fichier \033[38;5;27m%s\033[0m mal formaté : Nombre absent ligne %d", path, i);
+			return (FALSE);
+		}
+		n = ft_strchr(file.bytes + n, '\n') - (char *)file.bytes;
+		if ((ptr = ft_strchr(ptr + 1, ',')) != NULL && (void *)ptr < file.bytes + n)
+		{
+			FT_ERROR("Fichier \033[38;5;27m%s\033[0m mal formaté : Caractère de séparation (,) en trop ligne %d", path, i);
+			return (FALSE);
+		}
+		i = i + 1;
 	}
 
 	if ((tab = ft_strsplit(file.bytes, ",\n")) == NULL)
@@ -100,25 +147,23 @@ static void		ft_undo_scale(t_data *data, double scale, double scale_min)
 		data[n].km = data[n].km * scale + min;
 }
 
-static double	ft_get_margin(t_data *data, int m, double theta0, double theta1)
+static void		ft_get_margin(t_data *data, int m, double theta0, double theta1,
+							   double *margin)
 {
-	double	margin;
 	double	price;
 	double	diff;
 
-	margin = 0;
 	for (int i = 0 ; i < m ; i ++)
 	{
 		price = ESTIMATE_PRICE(data[i].km);
 		diff = ft_abs((float)(price - data[i].price));
-		if (margin < diff * 100 / price)
-			margin = diff * 100 / price;
+		if (*margin < diff * 100 / price)
+			*margin = diff * 100 / price;
 		FT_DEBUG("Estimate : %0.2f Price %0.2f diff : %f percent : %f", price, data[i].price, diff, diff * 100 / price);
 	}
-	return (margin);
 }
 
-static void		ft_learn(t_data *data, int m, double theta0, double theta1)
+static void		ft_learn(t_data *data, int m, double theta0, double theta1, double margin)
 {
 	float	tmpTheta0;
 	float	tmpTheta1;
@@ -146,7 +191,8 @@ static void		ft_learn(t_data *data, int m, double theta0, double theta1)
 	theta1 /= scale;
 	FT_DEBUG("theta0 : %f theta1 : %f", theta0, theta1);
 	ft_undo_scale(data, scale, scale_min);
-	ft_save_theta(theta0, theta1, ft_get_margin(data, m, theta0, theta1));
+	ft_get_margin(data, m, theta0, theta1, &margin);
+	ft_save_theta(theta0, theta1, margin);
 }
 
 int			main(int ac, char **av)
@@ -176,7 +222,7 @@ int			main(int ac, char **av)
 		return (1);
 	}
 
-	ft_learn(data, m, theta0, theta1);
+	ft_learn(data, m, theta0, theta1, margin);
 	free(data);
 
 	return (0);
